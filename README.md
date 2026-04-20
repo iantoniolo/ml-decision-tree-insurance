@@ -14,7 +14,16 @@ Projeto de Aprendizado de Maquina que aplica o algoritmo de **Arvore de Decisao*
 - Python
 - Scikit-learn (`DecisionTreeClassifier`)
 - Pandas / NumPy
-- Matplotlib / Seaborn
+- Matplotlib
+
+## Como Executar
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+jupyter notebook main.ipynb
+```
 
 ## Etapas do Projeto
 
