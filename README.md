@@ -1,6 +1,6 @@
 # Classificacao de Custo de Seguro Saude com Arvore de Decisao
 
-Projeto de Aprendizado de Maquina que aplica o algoritmo de **Arvore de Decisao** para classificar pacientes em **"custo alto"** ou **"custo baixo"** de seguro saude, variando os parametros de criterio de divisao (Gini vs Entropia) e profundidade maxima da arvore.
+Projeto de Aprendizado de Maquina que aplica o algoritmo de **Arvore de Decisao** para classificar pacientes em **"custo alto"** ou **"custo baixo"** de seguro saude, variando os parametros de criterio de divisao (Gini vs Entropia) e profundidade maxima da arvore. Ao final, a Arvore de Decisao e comparada com **Random Forest** e **Gradient Boosting** via cross-validation.
 
 ## Base de Dados
 
@@ -12,9 +12,10 @@ Projeto de Aprendizado de Maquina que aplica o algoritmo de **Arvore de Decisao*
 ## Tecnologias
 
 - Python
-- Scikit-learn (`DecisionTreeClassifier`)
+- Scikit-learn (`DecisionTreeClassifier`, `RandomForestClassifier`, `GradientBoostingClassifier`, `StratifiedKFold`)
 - Pandas / NumPy
-- Matplotlib
+- Matplotlib / Seaborn
+- Statsmodels (apenas no notebook complementar `lab_III.ipynb`)
 
 ## Como Executar
 
@@ -25,26 +26,31 @@ pip install -r requirements.txt
 jupyter notebook main.ipynb
 ```
 
+### Notebook complementar
+
+- `lab_III.ipynb` — replicacao em Python da regressao linear de LANTZ (`statsmodels.formula.api`), incluindo termos de interacao (`bmi30*smoker`) e termo nao linear `age2`. Serve como contraponto ao classificador: mostra por que `smoker` domina em regressao mas nao em classificacao binaria pela mediana.
+
 ## Etapas do Projeto
 
 ### 1. Importacao de Bibliotecas
 
-Importacao das bibliotecas necessarias para manipulacao de dados, visualizacao e modelagem.
+Importacao das bibliotecas necessarias para manipulacao de dados, visualizacao e modelagem, alem da definicao das constantes do experimento (`RANDOM_STATE`, `TEST_SIZE`, `DEPTH_RANGE`, `CRITERIA`, `EXPERIMENT_DEPTHS`).
 
 ### 2. Carregamento e Exploracao dos Dados
 
-Analise exploratoria da base de dados, incluindo estatisticas descritivas, distribuicao dos custos e das variaveis categoricas.
+Analise exploratoria da base de dados, incluindo estatisticas descritivas, distribuicao dos custos, distribuicao das variaveis categoricas e matriz de correlacao de Pearson.
 
 ![Distribuicao dos custos e variaveis categoricas](output/graph_1.png)
 
 - A distribuicao dos custos e assimetrica a direita, com a maioria dos pacientes concentrados em valores mais baixos.
 - A mediana dos custos e de $9.382, utilizada como limiar para a classificacao binaria.
 - As variaveis categoricas apresentam distribuicao relativamente equilibrada, exceto `smoker` (maioria nao fumante).
+- Na correlacao de Pearson com `charges`, `smoker` aparece como o atributo mais fortemente correlacionado, ja que fumantes pagam muito mais.
 
 ### 3. Pre-processamento
 
 - Criacao da variavel alvo binaria: pacientes com custo acima da mediana sao classificados como "alto" e abaixo como "baixo", resultando em classes perfeitamente balanceadas (50%/50%).
-- Codificacao de variaveis categoricas com Label Encoding (binarias) e One-Hot Encoding (regiao).
+- Codificacao de variaveis categoricas com Label Encoding seguida de One-Hot Encoding (`drop_first=True`) para `sex`, `smoker` e `region`.
 
 ### 4. Divisao Treino/Teste
 
@@ -70,19 +76,23 @@ Teste de profundidades de 1 a 20, demonstrando o trade-off entre underfitting e 
 ![Acuracia no Treino vs Teste por Profundidade](output/graph_3.png)
 
 - **Arvores rasas** (profundidade 1-2): underfitting, acuracia baixa em treino e teste.
-- **Arvores profundas** (sem limite): overfitting, acuracia de 100% no treino mas queda para ~87,5% no teste.
+- **Arvores profundas** (sem limite): overfitting, acuracia de 100% no treino mas queda para ~87,8% no teste.
 - **Melhor profundidade:** 4, com acuracia de teste de 94,03%.
+
+A escolha da profundidade tambem foi validada via **5-fold StratifiedKFold cross-validation**, que confirmou a profundidade 4 como otima (acuracia media = 92,30%).
 
 ### 7. Modelo Final e Analise
 
-Modelo final treinado com criterio Gini e profundidade maxima de 4, alcancando **94,03% de acuracia**.
+Modelo final treinado com criterio Gini e profundidade maxima de 4, alcancando **94,03% de acuracia** no conjunto de teste.
 
 ![Importancia dos Atributos](output/graph_4.png)
 
 Os atributos mais importantes para a classificacao foram:
-1. **age** (0.4976) - idade do paciente
-2. **smoker** (0.4498) - se o paciente e fumante
-3. **children** (0.0381) - numero de dependentes
+1. **age** (0.4933) - idade do paciente
+2. **smoker** (0.4545) - se o paciente e fumante
+3. **children** (0.0359) - numero de dependentes
+
+> **Por que `age` lidera e nao `smoker`?** Em classificacao binaria pela mediana, `age` aparece em multiplos cortes da arvore (`age > 25`, `age > 40`, ...), acumulando reducao de impureza, enquanto `smoker` (binario) e usado em poucos cortes. Em **regressao** (ver `lab_III.ipynb`, replicacao LANTZ), `smoker` domina com beta ~$24k. A permutation importance, por outro lado, confirma que `age` e `smoker` juntos somam ~0.50 de queda na acuracia, contra ~0.06 das demais variaveis somadas.
 
 ![Arvore de Decisao](output/graph_5.png)
 
@@ -95,15 +105,28 @@ A visualizacao da arvore mostra os 3 primeiros niveis de decisao, com a primeira
 | Gini     | 3          | 0.9135          | 0.9129         | 0.0005    |
 | Gini     | 5          | 0.9316          | 0.9353         | -0.0037   |
 | Gini     | 10         | 0.9573          | 0.9204         | 0.0369    |
-| Gini     | Sem limite | 1.0000          | 0.8756         | 0.1244    |
+| Gini     | Sem limite | 1.0000          | 0.8781         | 0.1219    |
 | Entropy  | 3          | 0.9081          | 0.9129         | -0.0048   |
 | Entropy  | 5          | 0.9231          | 0.9353         | -0.0122   |
-| Entropy  | 10         | 0.9605          | 0.9303         | 0.0301    |
-| Entropy  | Sem limite | 1.0000          | 0.8856         | 0.1144    |
+| Entropy  | 10         | 0.9605          | 0.9328         | 0.0276    |
+| Entropy  | Sem limite | 1.0000          | 0.8905         | 0.1095    |
+
+### 9. Variacao 3: Comparacao de Classificadores
+
+Comparacao da Arvore de Decisao final contra Random Forest e Gradient Boosting, todos avaliados via **5-fold StratifiedKFold cross-validation** sobre o dataset completo (sem ajuste de hiperparametros alem do default `n_estimators=100`):
+
+| Modelo                          | Acuracia (CV 5-fold) |
+|---------------------------------|----------------------|
+| Arvore de Decisao (depth=4)     | 0.9230 ± 0.0154      |
+| Random Forest (n=100)           | 0.9283 ± 0.0072      |
+| **Gradient Boosting (n=100)**   | **0.9320 ± 0.0166**  |
+
+Gradient Boosting obteve a melhor acuracia media, indicando que metodos de boosting conseguem extrair desempenho adicional sobre a Arvore de Decisao unica e sobre o Random Forest, mesmo sem ajuste fino de hiperparametros.
 
 ## Conclusao
 
 - **Gini vs Entropia:** Resultados praticamente identicos, consistente com a literatura.
-- **Profundidade:** O controle da profundidade e essencial para evitar overfitting. A profundidade ideal (4) equilibra complexidade e generalizacao.
-- **Atributos relevantes:** `smoker` e `age` dominam a classificacao, somando ~95% da importancia total.
-- O projeto demonstra na pratica os conceitos de **overfitting**, **underfitting** e **poda** (pruning) em Arvores de Decisao.
+- **Profundidade:** O controle da profundidade e essencial para evitar overfitting. A profundidade ideal (4) equilibra complexidade e generalizacao, confirmada tanto por holdout quanto por cross-validation.
+- **Atributos relevantes:** `age` e `smoker` dominam a classificacao, somando ~95% da importancia total. `age` lidera em classificacao binaria por aparecer em multiplos cortes da arvore; `smoker` dominaria em regressao (ver `lab_III.ipynb`).
+- **Comparacao de classificadores:** Gradient Boosting (~93,2%) superou Random Forest (~92,8%) e a Arvore de Decisao (~92,3%) na acuracia media via cross-validation.
+- O projeto demonstra na pratica os conceitos de **overfitting**, **underfitting**, **poda** (pruning) e **ensemble** (Random Forest e Gradient Boosting) em Arvores de Decisao.
